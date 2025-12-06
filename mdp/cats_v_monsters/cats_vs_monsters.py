@@ -104,7 +104,7 @@ class CatsVMonstersMDP(MDPBase):
                 new_state = state  # Stay in the same state if invalid
 
             # Assign the reward here for quick calculation later
-            reward = self.rewards_fn(new_state)
+            reward = self.reward_function(new_state)
 
             outcomes.append((new_state, prob, reward))
 

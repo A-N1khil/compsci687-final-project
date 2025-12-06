@@ -12,10 +12,10 @@ class MCTSNode:
         self.action = action  # Action taken to reach this node from parent
 
         # Additional attributes
-        self.children = []  # List of child nodes
+        self.children: list[MCTSNode] = []  # List of child nodes
         self.visits = 0  # Number of times this node has been visited
         self.value = 0.0  # Estimated value of this node
-        self.untested_actions = self.env.get_action_space(state)  # Actions not yet tried from this node
+        self.untested_actions = self.env.get_action_space().copy()  # Actions not yet tried from this node
 
     def is_fully_expanded(self):
         """Check if all actions have been tried from this node"""
@@ -24,6 +24,8 @@ class MCTSNode:
     def expand(self):
         """Expand the node by trying an untested action"""
 
+        if not self.untested_actions:
+            raise Exception("No untested actions available to expand.")
         action = self.untested_actions.pop()
         next_state, reward, done = self.env.take_step(self.state, action)
 
@@ -47,7 +49,7 @@ class MCTSNode:
         for child in self.children:
             exploitation_score = child.value / (child.visits + 1e-8)  # Numerical stability
             exploration_score = c_value * math.sqrt(
-                math.log(self.visits + 1) / child.visits + 1e-8)  # Numerical stability
+                math.log(self.visits + 1) / (child.visits + 1e-8))  # Numerical stability
             child_score = exploitation_score + exploration_score
 
             if child_score > best_score:
