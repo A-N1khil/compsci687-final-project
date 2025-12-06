@@ -9,6 +9,7 @@ class MDPBase(ABC):
         """Return the state space of the MDP."""
         raise NotImplementedError("The get_state_space method must be implemented by the subclass.")
 
+    @abstractmethod
     def get_action_space(self):
         """Return the action space of the MDP."""
         raise NotImplementedError("The get_action_space method must be implemented by the subclass.")
