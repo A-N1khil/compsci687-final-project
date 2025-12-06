@@ -1,7 +1,8 @@
 from mdp.base_config import BaseConfig
+from mdp.mdp_base import MDPBase
 
 
-class CatsVMonstersMDP:
+class CatsVMonstersMDP(MDPBase):
     """This class defines the MDP for the Cats vs Monsters environment."""
 
     def __init__(self, rows=5, cols=5):
@@ -52,7 +53,8 @@ class CatsVMonstersMDP:
 
         self.rng = base_config.get_rng()
 
-    def rewards_fn(self, state):
+    # noinspection PyUnusedLocal
+    def reward_function(self, state, action=None, next_state=None):
         if state == self.food:
             return 10  # Reward for reaching food
         elif state in self.monsters:
@@ -60,7 +62,7 @@ class CatsVMonstersMDP:
         else:
             return -0.05  # Small penalty for each move
 
-    def is_terminal_state(self, state):
+    def is_terminal(self, state):
         """A state is terminal if it is the food location"""
         return state == self.food
 
@@ -81,7 +83,7 @@ class CatsVMonstersMDP:
 
     def get_next_transitions(self, state, action):
         """Given a state and action, return possible next states and their probabilities."""
-        if self.is_terminal_state(state):
+        if self.is_terminal(state):
             return [(state, 1.0, 0)]  # No transitions from terminal state
 
         r, c = state
@@ -128,7 +130,16 @@ class CatsVMonstersMDP:
         reward = rewards[next_state_index]
 
         # Check if the next state is terminal
-        done = self.is_terminal_state(next_state)
+        done = self.is_terminal(next_state)
 
         # Return the next state, reward, and done flag
         return next_state, reward, done
+
+    def get_state_space(self):
+        return self.state_space
+
+    def step(self, state, action):
+        return self.take_step(state, action)
+
+    def get_terminal_states(self):
+        return [self.food]
