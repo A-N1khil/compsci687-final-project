@@ -1,10 +1,12 @@
 import math
 
+from mdp.mdp_base import MDPBase
+
 
 class MCTSNode:
     """Node class for Monte Carlo Tree Search"""
 
-    def __init__(self, env, state, parent=None, action=None):
+    def __init__(self, env: MDPBase, state, parent=None, action=None):
         # Required attributes
         self.env = env  # The environment (MDP)
         self.state = state  # The state represented by this node
@@ -17,6 +19,8 @@ class MCTSNode:
         self.value = 0.0  # Estimated value of this node
         self.untested_actions = self.env.get_action_space().copy()  # Actions not yet tried from this node
 
+        self.incoming_reward = 0.0  # Reward received upon reaching this node
+
     def is_fully_expanded(self):
         """Check if all actions have been tried from this node"""
         return len(self.untested_actions) == 0
@@ -27,7 +31,7 @@ class MCTSNode:
         if not self.untested_actions:
             raise Exception("No untested actions available to expand.")
         action = self.untested_actions.pop()
-        next_state, reward, done = self.env.take_step(self.state, action)
+        next_state, reward, done = self.env.step(self.state, action)
 
         child = MCTSNode(
             env=self.env,
@@ -35,6 +39,9 @@ class MCTSNode:
             parent=self,
             action=action
         )
+
+        # Store the incoming reward for this child node
+        child.incoming_reward = reward
 
         # Add this child to the list of children
         self.children.append(child)

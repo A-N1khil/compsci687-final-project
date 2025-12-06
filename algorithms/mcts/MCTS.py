@@ -13,7 +13,6 @@ class MCTS:
     def search(self, root_state, num_simulations=500, c_value=1.414):
 
         root = MCTSNode(env=self.env, state=root_state)
-        bar = tqdm(total=num_simulations, desc="MCTS simulations", leave=False)
         for _ in range(num_simulations):
             node = root
 
@@ -26,16 +25,10 @@ class MCTS:
                 node = node.expand()
 
             # Simulate a random playout from the expanded node
-            reward = self.rollout(node.state)
+            reward = node.incoming_reward + self.rollout(node.state)
 
             # Backpropagate the reward up the tree
             node.backpropagate(reward)
-
-            # Update progress bar
-            bar.update(1)
-
-        # Close progress bar
-        bar.close()
 
         return root, self.best_action(root)
 
@@ -75,19 +68,29 @@ class MCTS:
             state for state in state_space if self.env.is_state_valid(state)
         ]
 
+        total_reward = {state: 0.0 for state in valid_states}
+        total_visits = {state: 0 for state in valid_states}
+
         bar = tqdm(total=num_tries, desc="Estimating value function", leave=False)
         for _ in range(num_tries):
             root_state = self.rng.choice(valid_states)
             root, _ = self.search(
                 root_state, num_simulations=num_simulations, c_value=c_value
             )
-            print(
-                f"Root State: {root_state}, Value: {root.value}, Visits: {root.visits}"
-            )
-            value_function[root_state] = root.value / max(1, root.visits)
+            # Update total rewards and visits for the root state
+            total_reward[root_state] += root.value
+            total_visits[root_state] += root.visits
             # Update progress bar
             bar.update(1)
 
         # Close progress bar
         bar.close()
+        bar.disable = True
+
+        for state in valid_states:
+            if total_visits[state] > 0:
+                value_function[state] = total_reward[state] / total_visits[state]
+            else:
+                value_function[state] = 0.0  # or some default value
+
         return value_function
