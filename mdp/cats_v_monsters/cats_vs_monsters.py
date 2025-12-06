@@ -143,3 +143,6 @@ class CatsVMonstersMDP(MDPBase):
 
     def get_terminal_states(self):
         return [self.food]
+
+    def is_state_valid(self, state):
+        return self.is_valid_state(state)

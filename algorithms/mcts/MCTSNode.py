@@ -56,7 +56,11 @@ class MCTSNode:
 
         return best_child
 
-    def update(self, reward):
+    def backpropagate(self, reward):
         """Update the node's value and visit count based on the received reward"""
         self.visits += 1
         self.value += reward
+
+        # Propagate the reward to the parent node
+        if self.parent:
+            self.parent.backpropagate(reward)
