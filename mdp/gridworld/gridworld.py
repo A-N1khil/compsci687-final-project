@@ -4,9 +4,15 @@ from mdp.base_config import BaseConfig
 class GridWorldMDP:
     """This class defines the MDP for the GridWorld environment."""
 
-    def __init__(self,rows = 5,cols = 5, start = (0, 0),goal = (4, 4),
-    furniture = None,water = None,direction_probabilities = None):
-        """Initializes the GridWorld MDP with the given parameters"""
+    def __init__(
+        self,
+        rows = 5,
+        cols = 5,
+        start = (0, 0),
+        goal = (4, 4),
+        overrides = None,
+    ):
+        """Initializes the GridWorld MDP with optional override settings."""
         base_config = BaseConfig(seed=42)
         self.rows = rows
         self.cols = cols
