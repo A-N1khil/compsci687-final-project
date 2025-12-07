@@ -5,9 +5,8 @@ from mdp.mdp_base import MDPBase
 class CatsVMonstersMDP(MDPBase):
     """This class defines the MDP for the Cats vs Monsters environment."""
 
-    def __init__(self, rows=5, cols=5):
+    def __init__(self, rows=5, cols=5, base_config=BaseConfig(seed=42)):
         """We define the MDP for the Cats vs Monsters environment."""
-        base_config = BaseConfig(seed=42)
         self.rows = rows
         self.cols = cols
         self.state_space = [(r, c) for r in range(rows) for c in range(cols)]
@@ -51,6 +50,7 @@ class CatsVMonstersMDP(MDPBase):
             "stay": 0.06,
         }
 
+        base_config = base_config
         self.rng = base_config.get_rng()
 
     # noinspection PyUnusedLocal
