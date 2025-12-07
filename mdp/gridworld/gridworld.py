@@ -1,7 +1,8 @@
 from mdp.base_config import BaseConfig
+from mdp.mdp_base import MDPBase
 
 
-class GridWorldMDP:
+class GridWorldMDP(MDPBase):
     """This class defines the MDP for the GridWorld environment."""
 
     def __init__(
@@ -95,9 +96,6 @@ class GridWorldMDP:
             return self.water_reward
         return self.step_cost
 
-    def is_terminal_state(self, state):
-        """A state is terminal if it is the goal state"""
-        return state == self.goal
 
     def is_valid_state(self, state):
         """A state is valid if it is within the bounds and not a forbidden cell"""
@@ -137,8 +135,12 @@ class GridWorldMDP:
 
         return next_transitions
 
-    def sample_transition(self, state, action):
-        """Sample a transition tuple for a given state/action."""
+    def is_terminal(self, state):
+        """Check if a given state is terminal."""
+        return state == self.goal
+
+    def step(self, state, action):
+        """Take a step using the environment dynamics"""
         transitions = self.get_next_transitions(state, action)
         next_states,probs,rewards = [],[],[]
         for ns, p, r in transitions:
@@ -147,6 +149,15 @@ class GridWorldMDP:
             rewards.append(r)
         i = self.rng.choices(range(len(next_states)), weights=probs, k=1)[0]
         next_state,reward = next_states[i],rewards[i]
-        terminal = self.is_terminal_state(next_state)
+        terminal = self.is_terminal(next_state)
         return next_state, reward, terminal
+
+    def get_terminal_states(self):
+        """Return the terminal states"""
+        return [self.goal]
+
+    def reward_function(self, state, action=None, next_state=None):
+        """Return the reward for a given state, action, and next state."""
+        target_state = next_state if next_state is not None else state
+        return self.reward_fn(target_state)
 
