@@ -12,11 +12,11 @@ FeatureFn = Callable[[Any], np.ndarray]
 @dataclass(slots=True)
 class ReinforceAgentConfig:
     """Hyper-parameters controlling REINFORCE learning behaviour."""
-    gamma = 0.99
-    alpha_theta = 0.01
-    alpha_w = 0.05
-    use_baseline = True
-    seed = None
+    gamma: float = 0.99
+    alpha_theta: float = 0.01
+    alpha_w: float = 0.05
+    use_baseline: bool = True
+    seed: int | None = None
 
 @dataclass(slots=True)
 class EpisodeStats:

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 MIN_STEP_OUT_LEN = 3
 STEP_OUT_WITH_INFO_LEN = 4
+MIN_REQUIRED_STEP_ARGS = 2
 
 @dataclass(slots=True)
 class EpisodeStep:
@@ -78,6 +79,6 @@ class TrajectoryRunner:
             if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD)
             and param.default is inspect._empty
         ]
-        return len(required) >= 2
+        return len(required) >= MIN_REQUIRED_STEP_ARGS
 
 

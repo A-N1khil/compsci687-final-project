@@ -115,7 +115,7 @@ class GridWorldMDP(MDPBase):
 
     def get_next_transitions(self, state, action):
         """Given a state and action, return possible next states and their probabilities."""
-        if self.is_terminal_state(state):
+        if self.is_terminal(state):
             return [(state, 1.0, self.reward_fn(state))]
 
         next_transitions = []
