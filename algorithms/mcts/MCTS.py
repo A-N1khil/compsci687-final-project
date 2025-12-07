@@ -22,7 +22,7 @@ class MCTS:
 
             # Expand the node if it is not fully expanded
             if not node.is_fully_expanded():
-                node = node.expand()
+                _, node, _ = node.expand()
 
             # Simulate a random playout from the expanded node
             reward = node.incoming_reward + self.rollout(node.state)
@@ -35,10 +35,10 @@ class MCTS:
     def best_action(self, root: MCTSNode):
         best_action = None
         max_visits = -1
-        for child in root.children:
+        for action, child in root.children.items():
             if child.visits > max_visits:
                 max_visits = child.visits
-                best_action = child.action
+                best_action = action
         return best_action
 
     def rollout(self, state):
@@ -94,3 +94,65 @@ class MCTS:
                 value_function[state] = 0.0  # or some default value
 
         return value_function
+
+    def extract_policy(self, num_simulations=500, c_value=1.414):
+        policy = {}
+        valid_states = [
+            s for s in self.env.get_state_space() if self.env.is_state_valid(s)
+        ]
+
+        for state in tqdm(valid_states, desc="Extracting policy", leave=False):
+            root, _ = self.search(
+                state, num_simulations=num_simulations, c_value=c_value
+            )
+            best_a = None
+            best_visits = -1
+
+            for action, child in root.children.items():
+                if child.visits > best_visits:
+                    best_visits = child.visits
+                    best_a = action
+
+            policy[state] = best_a
+
+        return policy
+
+    def generate_value_function_and_policy(self, num_simulations=500, c_value=1.414):
+
+        # Get all valid states
+        valid_states = [
+            s for s in self.env.get_state_space() if self.env.is_state_valid(s)
+        ]
+
+        # Shuffle so we sample uniformly without replacement
+        self.rng.shuffle(valid_states)
+
+        value_function = {}
+        policy = {}
+
+        bar = tqdm(valid_states, desc="Evaluating all states", leave=False)
+
+        for state in bar:
+
+            # Run MCTS rooted at this state
+            root, _ = self.search(
+                state, num_simulations=num_simulations, c_value=c_value
+            )
+
+            # ----- Extract value estimate V(s) -----
+            V_s = root.value / max(root.visits, 1)
+            value_function[state] = V_s
+
+            # ----- Extract greedy policy π(s) -----
+            best_a, best_visits = None, -1
+            for action, child in root.children.items():
+                if child.visits > best_visits:
+                    best_visits = child.visits
+                    best_a = action
+
+            policy[state] = best_a
+
+        bar.close()
+        bar.disable = True
+
+        return value_function, policy
