@@ -29,7 +29,7 @@ class ReinforceBaselineAgent:
 
     def __init__(self, action_space, policy_feature_fn, value_feature_fn = None, config = None):
         """Initializes the ReinforceBaselineAgent"""
-        self.config = ReinforceAgentConfig()
+        self.config = config if config is not None else ReinforceAgentConfig()
         value_fn = value_feature_fn or policy_feature_fn
 
         self.policy = PolicyModule(action_space, policy_feature_fn, seed=self.config.seed)

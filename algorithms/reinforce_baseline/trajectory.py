@@ -1,4 +1,5 @@
 from __future__ import annotations
+import inspect
 import numpy as np
 from dataclasses import dataclass
 
@@ -42,20 +43,41 @@ class TrajectoryRunner:
 
     def _step(self, state, action):
         """Takes a step in the environment"""
-        if hasattr(self.env, "sample_transition"):
+        step_fn = getattr(self.env, "step", None)
+        if step_fn is not None:
+            if self._step_expects_state(step_fn):
+                step_out = step_fn(state, action)
+            else:
+                step_out = step_fn(action)
+        elif hasattr(self.env, "sample_transition"):
             next_state, reward, done = self.env.sample_transition(state, action)
             return next_state, float(reward), bool(done)
-
-        try:
-            step_out = self.env.step(action)
-        except TypeError:
-            step_out = self.env.step(state, action)
+        else:
+            raise AttributeError("Environment must define step() or sample_transition().")
 
         if len(step_out) == MIN_STEP_OUT_LEN:
             next_state, reward, done = step_out
         elif len(step_out) >= STEP_OUT_WITH_INFO_LEN:
             next_state, reward, done = step_out[0], step_out[1], step_out[2]
+        else:
+            raise ValueError(f"Unsupported step() return signature: {len(step_out)}")
 
         return next_state, float(reward), bool(done)
+
+    @staticmethod
+    def _step_expects_state(step_fn):
+        """Detect whether the bound step function expects the state argument."""
+        try:
+            sig = inspect.signature(step_fn)
+        except (TypeError, ValueError):
+            return False
+
+        required = [
+            param
+            for param in sig.parameters.values()
+            if param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD)
+            and param.default is inspect._empty
+        ]
+        return len(required) >= 2
 
 
