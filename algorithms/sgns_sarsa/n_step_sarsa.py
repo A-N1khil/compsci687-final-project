@@ -6,17 +6,22 @@ from mdp.mdp_base import MDPBase
 
 
 class Config:
-    def __init__(self, q_init_choice='optimistic', optimistic_value=5.0, action_selection='epsilon_greedy',
-                 epsilon=0.9):
+    def __init__(self, q_init_choice="optimistic", optimistic_value=5.0, epsilon=0.1):
         self.q_init_choice = q_init_choice
         self.optimistic_value = optimistic_value
-        self.action_selection = action_selection
         self.epsilon = epsilon
 
 
 class SGNStepSARSA:
 
-    def __init__(self, env: MDPBase, gamma=0.925, config=Config(), optimal_vf=None, base_config=BaseConfig(42)):
+    def __init__(
+        self,
+        env: MDPBase,
+        optimal_vf,
+        gamma=0.925,
+        config=Config(),
+        base_config=BaseConfig(42),
+    ):
         self.rng = base_config.get_rng()
         self.env = env
         self.gamma = gamma
@@ -25,97 +30,73 @@ class SGNStepSARSA:
         self.reset()
 
     def reset(self):
-        self.valid_states = [state for state in self.env.get_state_space() if self.env.is_state_valid(state)]
-        self.q_sa = {state: {action: 0.0 for action in self.env.get_action_space()} for state in self.valid_states}
+        self.valid_states = [
+            s for s in self.env.get_state_space() if self.env.is_state_valid(s)
+        ]
+        self.q_sa = {
+            s: {a: 0.0 for a in self.env.get_action_space()} for s in self.valid_states
+        }
         self.pointers = []
         self.num_steps = 0
         self.num_episodes = 0
         self.mse_data = []
 
     def optimistic_initialization(self, optimistic_value=5.0):
-        for state in self.q_sa:
-            for action in self.q_sa[state]:
-                self.q_sa[state][action] = optimistic_value
+        for s in self.q_sa:
+            for a in self.q_sa[s]:
+                self.q_sa[s][a] = optimistic_value
 
     def random_initialization(self):
-        for state in self.q_sa:
-            for action in self.q_sa[state]:
-                self.q_sa[state][action] = self.rng.uniform(0, 1.0)
+        for s in self.q_sa:
+            for a in self.q_sa[s]:
+                self.q_sa[s][a] = self.rng.uniform(0, 1.0)
 
     def equal_initialization(self, zeroes=False):
-        for state in self.q_sa:
-            for action in self.q_sa[state]:
-                if zeroes:
-                    self.q_sa[state][action] = 0.0
-                else:
-                    self.q_sa[state][action] = 1.0 / len(self.env.get_action_space())
+        for s in self.q_sa:
+            for a in self.q_sa[s]:
+                self.q_sa[s][a] = (
+                    0.0 if zeroes else 1.0 / len(self.env.get_action_space())
+                )
 
     def initialize_q(self):
         choice = self.config.q_init_choice
-        if choice == 'optimistic':
+        if choice == "optimistic":
             self.optimistic_initialization(self.config.optimistic_value)
-        elif choice == 'random':
+        elif choice == "random":
             self.random_initialization()
-        elif choice == 'equal':
+        elif choice == "equal":
             self.equal_initialization()
-        elif choice == 'zeroes':
+        elif choice == "zeroes":
             self.equal_initialization(zeroes=True)
 
-        # Set terminal states Q-values to 0
+        # Terminal Q-values = 0
         for terminal_state in self.env.get_terminal_states():
-            for action in self.q_sa[terminal_state]:
-                self.q_sa[terminal_state][action] = 0.0
+            for a in self.q_sa[terminal_state]:
+                self.q_sa[terminal_state][a] = 0.0
 
-    def epsilon_greedy_action(self, state, epsilon=0.9):
-        action_space = self.env.get_action_space()
-        best_q_val = max(self.q_sa[state].values())
-        best_actions = [action for action in action_space if self.q_sa[state][action] == best_q_val]
+    def epsilon_greedy_action(self, state, epsilon):
+        actions = self.env.get_action_space()
+        best_q = max(self.q_sa[state].values())
+        best_actions = [a for a in actions if self.q_sa[state][a] == best_q]
+
         if self.rng.random() < epsilon:
-            # Explore: choose a random action
-            return self.rng.choice(action_space)
-        else:
-            # Exploit: choose the best action
-            return self.rng.choice(best_actions)
+            return self.rng.choice(actions)  # explore
+        return self.rng.choice(best_actions)  # exploit
 
-    def softmax_action(self, state):
-        action_space = self.env.get_action_space()
-        state_q_vals = np.array([self.q_sa[state][action] for action in action_space], dtype=object)
-
-        z = state_q_vals - np.max(state_q_vals)
-        exp_q = np.exp(z.astype(np.float64))
-        probabilities = exp_q / np.sum(exp_q)
-
-        return self.rng.choices(action_space, weights=probabilities, k=1)[0]
-
-    def select_action(self, state):
-        if self.config.action_selection == 'epsilon_greedy':
-            return self.epsilon_greedy_action(state, self.config.epsilon)
-        elif self.config.action_selection == 'softmax':
-            return self.softmax_action(state)
-        else:
-            raise ValueError(f"Unknown action selection method: {self.config.action_selection}")
-
-    def run_episode(self, alpha: float, n_steps: int = 3, verbose: bool = False):
-        # Pick initial state
+    def run_episode(self, alpha: float, n_steps: int = 3):
         state = self.rng.choice(self.valid_states)
-        # Pick initial action
-        action = self.select_action(state)
+        action = self.epsilon_greedy_action(state, self.config.epsilon)
 
-        if verbose:
-            print(f"state: {state}, action: {action}")
-
-        # Initialize n-step buffer
         states = [state]
         actions = [action]
-        rewards = [] # reward at time t=0 is 0
-        time = 0
-        T = float('inf') # time when episode ends
+        rewards = []
 
-        self.num_steps += 1
+        time = 0
+        T = float("inf")
         total_reward = 0
 
         while True:
-            if time < T: # until episode ends
+            if time < T:
                 next_state, reward, done = self.env.step(state, action)
                 rewards.append(reward)
                 total_reward += reward
@@ -126,122 +107,121 @@ class SGNStepSARSA:
                     states.append(next_state)
                     actions.append(None)
                 else:
-                    next_action = self.select_action(next_state)
+                    next_action = self.epsilon_greedy_action(
+                        next_state, self.config.epsilon
+                    )
                     states.append(next_state)
                     actions.append(next_action)
                     state = next_state
                     action = next_action
 
             tau = time - n_steps + 1
+
             if tau >= 0:
+                # Compute G
                 G = 0.0
-                # Calculate G as the sum of rewards
                 for i in range(tau, min(tau + n_steps, T)):
                     G += (self.gamma ** (i - tau)) * rewards[i]
 
-                # If episode not ended, add the estimated value of the next state-action pair
+                # Bootstrap if needed
                 if tau + n_steps < T:
-                    next_time_step = tau + n_steps
-                    G += (self.gamma ** n_steps) * self.q_sa[states[next_time_step]][actions[next_time_step]]
+                    G += (self.gamma**n_steps) * self.q_sa[states[tau + n_steps]][
+                        actions[tau + n_steps]
+                    ]
 
-                # Perform Q-value update
+                # Update Q
                 if tau < T:
-                    tau_s = states[tau]
-                    tau_a = actions[tau]
-                    if tau_a is not None:
-                        td_error = G - self.q_sa[tau_s][tau_a]
-                        self.q_sa[tau_s][tau_a] += alpha * td_error
+                    s_tau = states[tau]
+                    a_tau = actions[tau]
+                    if a_tau is not None:
+                        td_error = G - self.q_sa[s_tau][a_tau]
+                        self.q_sa[s_tau][a_tau] += alpha * td_error
 
             if tau == T - 1:
-                break # all updates done
+                break
 
             time += 1
 
-        # Note to self: Do not call after done inside the loop, as it will mess up the pointers
-        # Since the loop runs until all updates are done
         self.post_episode()
         return total_reward
 
     def post_episode(self):
         self.num_episodes += 1
         self.pointers.append(self.num_steps)
-        # If MSE is to be calculated, then optimal_vf must be provided
-        v_estimate = self.compute_value_function(self.get_policy())
+
+        # Compute state-value estimate
+        policy = self.get_policy()
+        v_estimate = self.compute_value_function(policy)
+
+        # Compute MSE if optimal value function exists
         mse = self.compute_mse(v_estimate, self.optimal_vf)
         self.mse_data.append(mse)
 
     def run(self, num_episodes: int = 10000, alpha: float = 0.1, n_steps: int = 3):
-        # Reset
         self.reset()
         self.initialize_q()
+
         for _ in tqdm(range(num_episodes), desc="Running SARSA Episodes", leave=False):
             self.run_episode(alpha, n_steps=n_steps)
 
-    def run_20_times(self, num_episodes: int = 10000, alpha: float = 0.1, n_steps: int = 3):
+    def run_n_times(
+        self,
+        num_times: int = 10,
+        num_episodes: int = 10000,
+        alpha: float = 0.1,
+        n_steps: int = 3,
+    ):
         pointer_metadata = []
         mse_metadata = []
-        for _ in tqdm(range(20), desc="Running SARSA Episodes", leave=False):
+
+        for _ in tqdm(
+            range(num_times), desc=f"{num_times} Independent Runs", leave=False
+        ):
             self.run(num_episodes, alpha, n_steps=n_steps)
             pointer_metadata.append(self.pointers.copy())
             mse_metadata.append(self.mse_data.copy())
-        return pointer_metadata, mse_metadata
+
+        return np.array(pointer_metadata, dtype=object), np.array(
+            mse_metadata, dtype=object
+        )
 
     def get_policy(self):
         policy = {}
-        action_space = self.env.get_action_space()
-        num_actions = len(action_space)
+        actions = self.env.get_action_space()
+        A = len(actions)
 
         for state, q_values in self.q_sa.items():
-            q_vals_list = np.array([q_values[action] for action in action_space], dtype=object)
+            q_list = np.array([q_values[a] for a in actions])
+            eps = self.config.epsilon
+            max_q = np.max(q_list)
+            best_actions = [a for a in actions if q_values[a] == max_q]
+            B = len(best_actions)
+            prob = {}
+            for a in actions:
+                if a in best_actions:
+                    prob[a] = ((1 - eps) / B) + (eps / A)
+                else:
+                    prob[a] = eps / A
+            policy[state] = prob
 
-            if self.config.action_selection == 'epsilon_greedy':
-                epsilon = self.config.epsilon
-                max_q = np.max(q_vals_list)
-                best_actions = [action for action in action_space if q_values[action] == max_q]
-                num_best_actions = len(best_actions)
-
-                action_probabilities = {}
-                for action in action_space:
-                    if action in best_actions:
-                        action_probabilities[action] = ((1 - epsilon) / num_best_actions) + (epsilon / num_actions)
-                    else:
-                        action_probabilities[action] = epsilon / num_actions
-                policy[state] = action_probabilities
-            else:
-                z = q_vals_list - np.max(q_vals_list)
-                exp_q = np.exp(z.astype(np.float64))
-                probabilities = exp_q / np.sum(exp_q)
-                action_probabilities = {action: prob for action, prob in zip(action_space, probabilities)}
-                policy[state] = action_probabilities
         return policy
 
     def compute_value_function(self, policy):
-        value_function = {}
-        for state in self.q_sa:
-            v = 0.0
-            for action, action_prob in policy[state].items():
-                v += action_prob * self.q_sa[state][action]
-            value_function[state] = v
-        return value_function
+        """Vπ(s) = Σ_a π(a|s) Q(s,a)."""
+        v = {}
+        for s in self.valid_states:
+            v[s] = sum(
+                policy[s][a] * self.q_sa[s][a] for a in self.env.get_action_space()
+            )
+        return v
 
-    def compute_mse(self, v_estimate, v_optimal):
-        mse = 0.0
-        n = len(v_estimate)
-        for state in v_estimate:
-            mse += (v_estimate[state] - v_optimal[state]) ** 2
-        mse /= n
-        return mse
-
-    def get_greedy_policy(self, random_selection=False):
-        policy = {}
-        action_space = self.env.get_action_space()
-
-        for state, q_values in self.q_sa.items():
-            max_q = max(q_values.values())
-            best_actions = [action for action in action_space if q_values[action] == max_q]
-            if random_selection:
-                policy[state] = self.rng.choice(best_actions)
-            else:
-                policy[state] = best_actions[0]
-
-        return policy
+    def compute_mse(self, v_estimate, v_true):
+        """Compute mean squared error across states."""
+        if v_true is None:
+            return None
+        err = 0.0
+        count = 0
+        for s in v_estimate:
+            err += (v_estimate[s] - v_true[s]) ** 2
+            count += 1
+        return err / count
