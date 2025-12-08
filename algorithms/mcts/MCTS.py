@@ -1,4 +1,3 @@
-from openpyxl.styles.builtins import total
 from tqdm.notebook import tqdm
 
 from algorithms.mcts.MCTSNode import MCTSNode
