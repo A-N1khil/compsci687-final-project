@@ -69,11 +69,11 @@ class MCTSNode:
         exploration = c_value * math.sqrt(math.log(parent_visits) / self.visits)
         return exploitation + exploration
 
-    def backpropagate(self, reward):
+    def backpropagate(self, rollout_reward):
         """Update the node's value and visit count based on the received reward"""
         self.visits += 1
-        self.value += reward
+        self.value += rollout_reward
 
         # Propagate the reward to the parent node
         if self.parent:
-            self.parent.backpropagate(reward)
+            self.parent.backpropagate(rollout_reward)

@@ -5,7 +5,7 @@ from mdp.mdp_base import MDPBase
 class CatsVMonstersMDP(MDPBase):
     """This class defines the MDP for the Cats vs Monsters environment."""
 
-    def __init__(self, rows=5, cols=5, base_config=BaseConfig(seed=42)):
+    def __init__(self, rows=5, cols=5, base_config=BaseConfig(seed=42), gamma=0.9):
         """We define the MDP for the Cats vs Monsters environment."""
         self.rows = rows
         self.cols = cols
@@ -50,8 +50,11 @@ class CatsVMonstersMDP(MDPBase):
             "stay": 0.06,
         }
 
-        base_config = base_config
         self.rng = base_config.get_rng()
+        self.gamma = gamma
+
+    def get_gamma(self):
+        return self.gamma
 
     # noinspection PyUnusedLocal
     def reward_function(self, state, action=None, next_state=None):
