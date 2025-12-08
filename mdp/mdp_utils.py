@@ -47,6 +47,5 @@ def max_norm_error(v1: dict, v2: dict):
         v2_state_value = v2.get(state, 0.0) or 0
         v1_state_value = v1.get(state, 0.0) or 0
         error = abs(v1_state_value - v2_state_value)
-        if error > max_error:
-            max_error = error
+        max_error = max(error, max_error)
     return max_error
