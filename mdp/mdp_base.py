@@ -43,3 +43,6 @@ class MDPBase(ABC):
     def get_next_transitions(self, state, action):
         """Required for value iteration and policy iteration algorithms."""
         raise NotImplementedError("The get_next_transitions method must be implemented by the subclass.")
+
+    def get_gamma(self):
+        pass
