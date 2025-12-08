@@ -84,6 +84,10 @@ class CatsVMonstersMDP(MDPBase):
         """Return only the valid states in the state space"""
         return [state for state in self.state_space if self.is_valid_state(state)]
 
+    def is_state_valid(self, state):
+        """Alias used by generic planners such as value iteration."""
+        return self.is_valid_state(state)
+
     def get_next_transitions(self, state, action):
         """Given a state and action, return possible next states and their probabilities."""
         if self.is_terminal(state):

@@ -80,6 +80,10 @@ class GridWorldMDP(MDPBase):
         """Returns valid state space"""
         return [state for state in self.state_space if self.is_valid_state(state)]
 
+    def is_state_valid(self, state):
+        """Alias required by value-iteration algorithms."""
+        return self.is_valid_state(state)
+
     def get_action_space(self):
         """Returns action space"""
         return self.action_space
