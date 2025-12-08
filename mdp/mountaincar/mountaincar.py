@@ -43,7 +43,7 @@ class MountainCarMDP(MDPBase):
         Take a step in the environment. 
         """
         next_state, reward, terminated, truncated, info = self.env.step(action)
-        done = terminated or truncated # Gymnasium has seperate flags for success and timeout , but we need to count both as done
+        done = terminated or truncated # Gymnasium has separate flags for success and timeout , but we need to count both as done
 
         return (np.array(next_state, dtype=np.float32),reward,done,info,)
 
