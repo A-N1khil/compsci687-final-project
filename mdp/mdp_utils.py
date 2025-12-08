@@ -43,9 +43,9 @@ def max_norm_error(v1: dict, v2: dict):
     """Compute the MaxNorm error between two value functions."""
     max_error = float("-inf")
     for state in list(v1.keys()):
-        v1_state_value = v1[state] or 0.0
-        v2_state_value = v2[state] or 0.0
+        # Get the value from v2, defaulting to 0.0 if state not present
+        v2_state_value = v2.get(state, 0.0) or 0
+        v1_state_value = v1.get(state, 0.0) or 0
         error = abs(v1_state_value - v2_state_value)
-        if error > max_error:
-            max_error = error
+        max_error = max(error, max_error)
     return max_error
