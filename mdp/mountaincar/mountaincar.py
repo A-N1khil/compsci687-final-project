@@ -19,6 +19,9 @@ class MountainCarMDP(MDPBase):
         # Actions: 0=push left, 1=no push, 2=push right
         self.action_space = self.env.action_space
 
+        # Goal position
+        self.goal_pos = 0.5
+
         if seed is not None:
             self.env.reset(seed=seed)
 
@@ -46,7 +49,7 @@ class MountainCarMDP(MDPBase):
 
     def is_terminal(self, state):
         """Terminal when car reaches or passes the goal."""
-        return bool(state[0] >= 0.5)
+        return bool(state[0] >= self.goal_pos)
 
     def get_terminal_states(self):
         """Not applicable for continuous domains."""
@@ -72,5 +75,4 @@ class MountainCarMDP(MDPBase):
         but this method is needed to satisfy the MDPBase interface used for the project. 
         """
         next_state, reward, terminated, truncated, info = self.env.step(action)
-        done = terminated or truncated
         return [(np.array(next_state, dtype=np.float32), 1.0, reward)]
