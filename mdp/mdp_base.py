@@ -33,3 +33,13 @@ class MDPBase(ABC):
     def reward_function(self, state, action=None, next_state=None):
         """Return the reward for a given state, action, and next state."""
         raise NotImplementedError("The reward_function method must be implemented by the subclass.")
+
+    @abstractmethod
+    def is_state_valid(self, state):
+        """Check if a given state is valid within the MDP."""
+        raise NotImplementedError("The is_state_valid method must be implemented by the subclass.")
+
+    @abstractmethod
+    def get_next_transitions(self, state, action):
+        """Required for value iteration and policy iteration algorithms."""
+        raise NotImplementedError("The get_next_transitions method must be implemented by the subclass.")
