@@ -95,16 +95,19 @@ class SGNStepSARSA:
         else:
             raise ValueError(f"Unknown action selection method: {self.config.action_selection}")
 
-    def run_episode(self, alpha: float, n_steps: int = 3):
+    def run_episode(self, alpha: float, n_steps: int = 3, verbose: bool = False):
         # Pick initial state
         state = self.rng.choice(self.valid_states)
         # Pick initial action
         action = self.select_action(state)
 
+        if verbose:
+            print(f"state: {state}, action: {action}")
+
         # Initialize n-step buffer
         states = [state]
         actions = [action]
-        rewards = [0.0] # reward at time t=0 is 0
+        rewards = [] # reward at time t=0 is 0
         time = 0
         T = float('inf') # time when episode ends
 
@@ -120,17 +123,21 @@ class SGNStepSARSA:
 
                 if done:
                     T = time + 1
+                    states.append(next_state)
+                    actions.append(None)
                 else:
                     next_action = self.select_action(next_state)
                     states.append(next_state)
                     actions.append(next_action)
+                    state = next_state
+                    action = next_action
 
             tau = time - n_steps + 1
             if tau >= 0:
                 G = 0.0
                 # Calculate G as the sum of rewards
-                for i in range(tau + 1, min(tau + n_steps, T) + 1):
-                    G += (self.gamma ** (i - tau - 1)) * rewards[i]
+                for i in range(tau, min(tau + n_steps, T)):
+                    G += (self.gamma ** (i - tau)) * rewards[i]
 
                 # If episode not ended, add the estimated value of the next state-action pair
                 if tau + n_steps < T:
@@ -138,13 +145,17 @@ class SGNStepSARSA:
                     G += (self.gamma ** n_steps) * self.q_sa[states[next_time_step]][actions[next_time_step]]
 
                 # Perform Q-value update
-                tau_s = states[tau]
-                tau_a = actions[tau]
-                td_error = G - self.q_sa[tau_s][tau_a]
-                self.q_sa[tau_s][tau_a] += alpha * td_error
+                if tau < T:
+                    tau_s = states[tau]
+                    tau_a = actions[tau]
+                    if tau_a is not None:
+                        td_error = G - self.q_sa[tau_s][tau_a]
+                        self.q_sa[tau_s][tau_a] += alpha * td_error
 
             if tau == T - 1:
                 break # all updates done
+
+            time += 1
 
         # Note to self: Do not call after done inside the loop, as it will mess up the pointers
         # Since the loop runs until all updates are done
@@ -159,18 +170,18 @@ class SGNStepSARSA:
         mse = self.compute_mse(v_estimate, self.optimal_vf)
         self.mse_data.append(mse)
 
-    def run(self, num_episodes: int = 10000, alpha: float = 0.1):
-        self.initialize_q()
+    def run(self, num_episodes: int = 10000, alpha: float = 0.1, n_steps: int = 3):
         # Reset
         self.reset()
+        self.initialize_q()
         for _ in tqdm(range(num_episodes), desc="Running SARSA Episodes", leave=False):
-            self.run_episode(alpha)
+            self.run_episode(alpha, n_steps=n_steps)
 
-    def run_20_times(self, num_episodes: int = 10000, alpha: float = 0.1):
+    def run_20_times(self, num_episodes: int = 10000, alpha: float = 0.1, n_steps: int = 3):
         pointer_metadata = []
         mse_metadata = []
         for _ in tqdm(range(20), desc="Running SARSA Episodes", leave=False):
-            self.run(num_episodes, alpha)
+            self.run(num_episodes, alpha, n_steps=n_steps)
             pointer_metadata.append(self.pointers.copy())
             mse_metadata.append(self.mse_data.copy())
         return pointer_metadata, mse_metadata
