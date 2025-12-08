@@ -55,3 +55,22 @@ class MountainCarMDP(MDPBase):
     def reward_function(self, state, action=None, next_state=None):
         """-1 per step until reaching the goal, same as MountainCar default."""
         return 0.0 if self.is_terminal(state) else -1.0
+
+    def is_state_valid(self, state):
+        """
+        Since MountainCar is continuous, any state within the environment bounds is valid.
+        """
+        pos, vel = state
+        return (self.env.observation_space.low[0] <= pos <= self.env.observation_space.high[0] and
+                self.env.observation_space.low[1] <= vel <= self.env.observation_space.high[1])
+
+    def get_next_transitions(self, state, action):
+        """
+        Transition dynamics are handled internally by Gymnasium,so each step is returned as a single outcome with prob 1.0.
+
+        Note: This method is not used by Actor-Critic as it is model free, 
+        but this method is needed to satisfy the MDPBase interface used for the project. 
+        """
+        next_state, reward, terminated, truncated, info = self.env.step(action)
+        done = terminated or truncated
+        return [(np.array(next_state, dtype=np.float32), 1.0, reward)]
