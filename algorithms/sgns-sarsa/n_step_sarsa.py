@@ -1,39 +1,32 @@
-import random
-
 import numpy as np
 from tqdm.auto import tqdm
 
-from mdp.cats_v_monsters.cats_vs_monsters import CatsVMonstersMDP
+from mdp.base_config import BaseConfig
+from mdp.mdp_base import MDPBase
 
 
 class Config:
-    def __init__(self, method='sarsa', q_init_choice='optimistic', optimistic_value=5.0, action_selection='epsilon_greedy',
+    def __init__(self, q_init_choice='optimistic', optimistic_value=5.0, action_selection='epsilon_greedy',
                  epsilon=0.9):
-        self.method = method
         self.q_init_choice = q_init_choice
         self.optimistic_value = optimistic_value
         self.action_selection = action_selection
         self.epsilon = epsilon
 
 
-class SarsaQL:
+class SGNStepSARSA:
 
-    def __init__(self, rng=random.Random(), gamma=0.925, config=Config(), optimal_vf = None):
-        self.mdp: CatsVMonstersMDP = CatsVMonstersMDP(rng=rng)
-        self.rng = rng
+    def __init__(self, env: MDPBase, gamma=0.925, config=Config(), optimal_vf=None, base_config=BaseConfig(42)):
+        self.rng = base_config.get_rng()
+        self.env = env
         self.gamma = gamma
-        self.q_sa = {state: {action: 0.0 for action in self.mdp.get_action_space()} for state in
-                     self.mdp.get_valid_state_space()}
         self.config = config
-        self.pointers = []
-        self.num_steps = 0
-        self.num_episodes = 0
-        self.mse_data = []
         self.optimal_vf = optimal_vf
+        self.reset()
 
     def reset(self):
-        self.q_sa = {state: {action: 0.0 for action in self.mdp.get_action_space()} for state in
-                     self.mdp.get_valid_state_space()}
+        self.valid_states = [state for state in self.env.get_state_space() if self.env.is_state_valid(state)]
+        self.q_sa = {state: {action: 0.0 for action in self.env.get_action_space()} for state in self.valid_states}
         self.pointers = []
         self.num_steps = 0
         self.num_episodes = 0
@@ -55,7 +48,7 @@ class SarsaQL:
                 if zeroes:
                     self.q_sa[state][action] = 0.0
                 else:
-                    self.q_sa[state][action] = 1.0 / len(self.mdp.get_action_space())
+                    self.q_sa[state][action] = 1.0 / len(self.env.get_action_space())
 
     def initialize_q(self):
         choice = self.config.q_init_choice
@@ -69,10 +62,12 @@ class SarsaQL:
             self.equal_initialization(zeroes=True)
 
         # Set terminal states Q-values to 0
-        self.q_sa[self.mdp.food] = {action: 0.0 for action in self.mdp.get_action_space()}
+        for terminal_state in self.env.get_terminal_states():
+            for action in self.q_sa[terminal_state]:
+                self.q_sa[terminal_state][action] = 0.0
 
     def epsilon_greedy_action(self, state, epsilon=0.9):
-        action_space = self.mdp.get_action_space()
+        action_space = self.env.get_action_space()
         best_q_val = max(self.q_sa[state].values())
         best_actions = [action for action in action_space if self.q_sa[state][action] == best_q_val]
         if self.rng.random() < epsilon:
@@ -83,7 +78,7 @@ class SarsaQL:
             return self.rng.choice(best_actions)
 
     def softmax_action(self, state):
-        action_space = self.mdp.get_action_space()
+        action_space = self.env.get_action_space()
         state_q_vals = np.array([self.q_sa[state][action] for action in action_space], dtype=object)
 
         z = state_q_vals - np.max(state_q_vals)
@@ -100,47 +95,64 @@ class SarsaQL:
         else:
             raise ValueError(f"Unknown action selection method: {self.config.action_selection}")
 
-    def run_episode(self, alpha: float):
+    def run_episode(self, alpha: float, n_steps: int = 3):
         # Pick initial state
-        state = self.rng.choice(self.mdp.get_valid_state_space())
+        state = self.rng.choice(self.valid_states)
         # Pick initial action
         action = self.select_action(state)
+
+        # Initialize n-step buffer
+        states = [state]
+        actions = [action]
+        rewards = [0.0] # reward at time t=0 is 0
+        time = 0
+        T = float('inf') # time when episode ends
+
         self.num_steps += 1
-        done = False
         total_reward = 0
 
-        while not done:
-            next_state, reward, done = self.mdp.take_step(state, action)
-            total_reward += reward
-            self.num_steps += 1
+        while True:
+            if time < T: # until episode ends
+                next_state, reward, done = self.env.step(state, action)
+                rewards.append(reward)
+                total_reward += reward
+                self.num_steps += 1
 
-            if done:
-                td_target = reward
-                td_error = td_target - self.q_sa[state][action]
-                self.q_sa[state][action] += alpha * td_error
-                self.post_episode()
-                break
+                if done:
+                    T = time + 1
+                else:
+                    next_action = self.select_action(next_state)
+                    states.append(next_state)
+                    actions.append(next_action)
 
-            if self.config.method == 'sarsa':
-                next_action = self.select_action(next_state)
-                td_target = reward + self.gamma * self.q_sa[next_state][next_action]
-            elif self.config.method == 'q_learning':
-                max_next_q = max(self.q_sa[next_state].values())
-                td_target = reward + self.gamma * max_next_q
-                next_action = self.select_action(next_state)
-            else:
-                raise ValueError(f"Unknown method: {self.config.method}")
+            tau = time - n_steps + 1
+            if tau >= 0:
+                G = 0.0
+                # Calculate G as the sum of rewards
+                for i in range(tau + 1, min(tau + n_steps, T) + 1):
+                    G += (self.gamma ** (i - tau - 1)) * rewards[i]
 
+                # If episode not ended, add the estimated value of the next state-action pair
+                if tau + n_steps < T:
+                    next_time_step = tau + n_steps
+                    G += (self.gamma ** n_steps) * self.q_sa[states[next_time_step]][actions[next_time_step]]
 
-            td_error = td_target - self.q_sa[state][action]
-            self.q_sa[state][action] += alpha * td_error
+                # Perform Q-value update
+                tau_s = states[tau]
+                tau_a = actions[tau]
+                td_error = G - self.q_sa[tau_s][tau_a]
+                self.q_sa[tau_s][tau_a] += alpha * td_error
 
-            state = next_state
-            action = next_action
+            if tau == T - 1:
+                break # all updates done
 
+        # Note to self: Do not call after done inside the loop, as it will mess up the pointers
+        # Since the loop runs until all updates are done
+        self.post_episode()
         return total_reward
 
     def post_episode(self):
+        self.num_episodes += 1
         self.pointers.append(self.num_steps)
         # If MSE is to be calculated, then optimal_vf must be provided
         v_estimate = self.compute_value_function(self.get_policy())
@@ -165,7 +177,7 @@ class SarsaQL:
 
     def get_policy(self):
         policy = {}
-        action_space = self.mdp.get_action_space()
+        action_space = self.env.get_action_space()
         num_actions = len(action_space)
 
         for state, q_values in self.q_sa.items():
@@ -211,7 +223,7 @@ class SarsaQL:
 
     def get_greedy_policy(self, random_selection=False):
         policy = {}
-        action_space = self.mdp.get_action_space()
+        action_space = self.env.get_action_space()
 
         for state, q_values in self.q_sa.items():
             max_q = max(q_values.values())
