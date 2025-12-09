@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def display_value_function(mdp, value_function):
     # Create a grid representation of the value function
     value_function_grid = np.full((mdp.rows, mdp.cols), None)
@@ -31,13 +32,15 @@ def display_policy(mdp, policy):
         row, col = state
         policy_grid[row, col] = action_symbols[action]
 
-    policy_grid[mdp.food] = "G"
+    for state in mdp.get_terminal_states():
+        policy_grid[state] = "G"
 
     # Display the policy grid
     for row in policy_grid:
         for symbol in row:
             print(symbol, end="\t")
         print()
+
 
 def max_norm_error(v1: dict, v2: dict):
     """Compute the MaxNorm error between two value functions."""

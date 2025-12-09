@@ -46,3 +46,6 @@ class MDPBase(ABC):
 
     def get_gamma(self):
         pass
+
+    def reset(self):
+        pass
