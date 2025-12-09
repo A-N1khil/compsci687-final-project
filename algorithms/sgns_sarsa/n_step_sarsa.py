@@ -40,6 +40,7 @@ class SGNStepSARSA:
         self.num_steps = 0
         self.num_episodes = 0
         self.mse_data = []
+        self.vf_data = []
 
     def optimistic_initialization(self, optimistic_value=5.0):
         for s in self.q_sa:
@@ -152,6 +153,7 @@ class SGNStepSARSA:
         # Compute state-value estimate
         policy = self.get_policy()
         v_estimate = self.compute_value_function(policy)
+        self.vf_data.append(v_estimate)
 
         # Compute MSE if optimal value function exists
         mse = self.compute_mse(v_estimate, self.optimal_vf)
@@ -173,6 +175,7 @@ class SGNStepSARSA:
     ):
         pointer_metadata = []
         mse_metadata = []
+        vf_data = []
 
         for _ in tqdm(
             range(num_times), desc=f"{num_times} Independent Runs", leave=False
@@ -180,9 +183,12 @@ class SGNStepSARSA:
             self.run(num_episodes, alpha, n_steps=n_steps)
             pointer_metadata.append(self.pointers.copy())
             mse_metadata.append(self.mse_data.copy())
+            vf_data.append(self.vf_data[-1].copy())
 
-        return np.array(pointer_metadata, dtype=object), np.array(
-            mse_metadata, dtype=object
+        return (
+            np.array(pointer_metadata, dtype=object),
+            np.array(mse_metadata, dtype=object),
+            np.array(vf_data, dtype=object),
         )
 
     def get_policy(self):
@@ -207,7 +213,6 @@ class SGNStepSARSA:
         return policy
 
     def compute_value_function(self, policy):
-        """Vπ(s) = Σ_a π(a|s) Q(s,a)."""
         v = {}
         for s in self.valid_states:
             v[s] = sum(
@@ -225,3 +230,19 @@ class SGNStepSARSA:
             err += (v_estimate[s] - v_true[s]) ** 2
             count += 1
         return err / count
+
+    def get_greedy_policy(self, random_selection=False):
+        policy = {}
+        action_space = self.env.get_action_space()
+
+        for state, q_values in self.q_sa.items():
+            max_q = max(q_values.values())
+            best_actions = [
+                action for action in action_space if q_values[action] == max_q
+            ]
+            if random_selection:
+                policy[state] = self.rng.choice(best_actions)
+            else:
+                policy[state] = best_actions[0]
+
+        return policy
