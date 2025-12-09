@@ -1,4 +1,4 @@
-import gymnasium as gym  # Using Gymnasium instead of Gym since Gym is deprecated and caused numpy warnings
+import gymnasium as gym # Using Gymnasium instead of Gym since Gym is deprecated and caused numpy warnings
 import numpy as np
 from mdp.mdp_base import MDPBase
 
@@ -40,19 +40,12 @@ class MountainCarMDP(MDPBase):
 
     def step(self, state, action):
         """
-        Take a step in the environment.
+        Take a step in the environment. 
         """
         next_state, reward, terminated, truncated, info = self.env.step(action)
-        done = (
-            terminated or truncated
-        )  # Gymnasium has separate flags for success and timeout , but we need to count both as done
+        done = terminated or truncated # Gymnasium has separate flags for success and timeout , but we need to count both as done
 
-        return (
-            np.array(next_state, dtype=np.float32),
-            reward,
-            done,
-            info,
-        )
+        return (np.array(next_state, dtype=np.float32),reward,done,info,)
 
     def is_terminal(self, state):
         """Terminal when car reaches or passes the goal."""
@@ -71,21 +64,15 @@ class MountainCarMDP(MDPBase):
         Since MountainCar is continuous, any state within the environment bounds is valid.
         """
         pos, vel = state
-        return (
-            self.env.observation_space.low[0]
-            <= pos
-            <= self.env.observation_space.high[0]
-            and self.env.observation_space.low[1]
-            <= vel
-            <= self.env.observation_space.high[1]
-        )
+        return (self.env.observation_space.low[0] <= pos <= self.env.observation_space.high[0] and
+                self.env.observation_space.low[1] <= vel <= self.env.observation_space.high[1])
 
     def get_next_transitions(self, state, action):
         """
         Transition dynamics are handled internally by Gymnasium,so each step is returned as a single outcome with prob 1.0.
 
-        Note: This method is not used by Actor-Critic as it is model free,
-        but this method is needed to satisfy the MDPBase interface used for the project.
+        Note: This method is not used by Actor-Critic as it is model free, 
+        but this method is needed to satisfy the MDPBase interface used for the project. 
         """
         next_state, reward, terminated, truncated, info = self.env.step(action)
         return [(np.array(next_state, dtype=np.float32), 1.0, reward)]
