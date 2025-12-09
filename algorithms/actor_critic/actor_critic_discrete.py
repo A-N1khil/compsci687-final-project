@@ -1,13 +1,16 @@
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from torch import nn
+from torch import optim
 from torch.distributions import Categorical
 from dataclasses import dataclass
 from mdp.gridworld.gridworld import GridWorldMDP
 
 
 # defining config dataclass for hyperparameters
+
+STEP_OUTPUT_LEN_WITH_INFO = 4
+
 @dataclass
 class ACConfig:
     num_episodes: int = 1000
@@ -18,6 +21,7 @@ class ACConfig:
     hidden_size: int = 128
     seed: int = 42
     label: str = "default"
+    
 
 
 # defining small helper to convert state to numpy array
@@ -136,7 +140,7 @@ class DiscreteActorCriticAgent:
             action_idx, log_prob, value, entropy = self.select_action(state_np)
 
             step_out = env.step(action_idx)
-            if len(step_out) == 4:
+            if len(step_out) == STEP_OUTPUT_LEN_WITH_INFO:
                 next_state, reward, done, _ = step_out
             else:
                 next_state, reward, done = step_out
