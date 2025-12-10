@@ -5,12 +5,13 @@ from mdp.mdp_base import MDPBase
 class CatsVMonstersMDP(MDPBase):
     """This class defines the MDP for the Cats vs Monsters environment."""
 
-    def __init__(self, rows=5, cols=5):
+    def __init__(self, rows=5, cols=5, start=(0, 0)):
         """We define the MDP for the Cats vs Monsters environment."""
         base_config = BaseConfig(seed=42)
         self.rows = rows
         self.cols = cols
         self.state_space = [(r, c) for r in range(rows) for c in range(cols)]
+        self.start = start
         self.action_space = ["up", "down", "left", "right"]
 
         # Terminal state
@@ -52,6 +53,8 @@ class CatsVMonstersMDP(MDPBase):
         }
 
         self.rng = base_config.get_rng()
+        if not self.is_valid_state(self.start):
+            raise ValueError(f"Start state {self.start} must be a valid, traversable cell.")
 
     # noinspection PyUnusedLocal
     def reward_function(self, state, action=None, next_state=None):
@@ -81,6 +84,10 @@ class CatsVMonstersMDP(MDPBase):
         """Return only the valid states in the state space"""
         return [state for state in self.state_space if self.is_valid_state(state)]
 
+    def is_state_valid(self, state):
+        """Alias used by generic planners such as value iteration."""
+        return self.is_valid_state(state)
+
     def get_next_transitions(self, state, action):
         """Given a state and action, return possible next states and their probabilities."""
         if self.is_terminal(state):
@@ -104,7 +111,7 @@ class CatsVMonstersMDP(MDPBase):
                 new_state = state  # Stay in the same state if invalid
 
             # Assign the reward here for quick calculation later
-            reward = self.rewards_fn(new_state)
+            reward = self.reward_function(new_state)
 
             outcomes.append((new_state, prob, reward))
 
@@ -134,6 +141,10 @@ class CatsVMonstersMDP(MDPBase):
 
         # Return the next state, reward, and done flag
         return next_state, reward, done
+
+    def reset(self):
+        """Reset the environment to the designated start state."""
+        return self.start
 
     def get_state_space(self):
         return self.state_space
