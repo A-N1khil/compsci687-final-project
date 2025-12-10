@@ -14,7 +14,7 @@ class MCConfig:
 
 
 class NStepSarsaMC:
-    def __init__(
+    def __init__(  # noqa: PLR0913 - constructor needs full hyperparameter set
         self,
         env,
         config: MCConfig,

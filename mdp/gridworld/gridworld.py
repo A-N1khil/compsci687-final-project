@@ -164,4 +164,3 @@ class GridWorldMDP(MDPBase):
         """Return the reward for a given state, action, and next state."""
         target_state = next_state if next_state is not None else state
         return self.reward_fn(target_state)
-
