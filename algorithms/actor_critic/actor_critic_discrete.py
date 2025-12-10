@@ -164,58 +164,59 @@ class DiscreteActorCriticAgent:
 
         return log_probs, values, rewards, entropies, last_value, done
 
-    # running full training loop across episodes
-    def train(self, env, log_interval=10, debug_interval=50):
-        episode_rewards = []
-        best_reward = -1e9
+def train(self, env, log_interval=10, debug_interval=50):
+    episode_rewards = []
+    episode_losses = []          # NEW
+    episode_values = []          # NEW
+    episode_entropies = []       # NEW
 
-        for episode in range(self.cfg.num_episodes):
-            (log_probs,values,rewards,entropies,last_value,done,) = self.run_episode(env)
+    best_reward = -1e9
 
-            returns = self.compute_returns(rewards, last_value, done)
+    for episode in range(self.cfg.num_episodes):
+        (log_probs, values, rewards, entropies, last_value, done) = self.run_episode(env)
+        returns = self.compute_returns(rewards, last_value, done)
 
-            # applying very mild entropy decay over time
-            self.entropy_coef = max(1e-6, self.entropy_coef * 0.995)
+        self.entropy_coef = max(1e-6, self.entropy_coef * 0.995)
 
-            loss = self.compute_loss(log_probs, values, returns, entropies)
-            episode_return = float(sum(rewards))
+        loss = self.compute_loss(log_probs, values, returns, entropies)
+        episode_return = float(sum(rewards))
 
-            self.optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.net.parameters(), 0.5)
-            self.optimizer.step()
+        self.optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.net.parameters(), 0.5)
+        self.optimizer.step()
 
-            episode_rewards.append(episode_return)
-            best_reward = max(best_reward, episode_return)
+        episode_rewards.append(episode_return)
+        best_reward = max(best_reward, episode_return)
+        episode_losses.append(loss.item())   # NEW
 
-            if (episode + 1) % log_interval == 0:
-                print(
-                    f"Episode {episode+1}/{self.cfg.num_episodes}, "
-                    f"Return: {episode_return:.2f}, "
-                    f"Best so far: {best_reward:.2f}"
-                )
+        if episode % debug_interval == 0:
+            with torch.no_grad():
+                eval_state = env.reset()
+                eval_tensor = torch.from_numpy(
+                    to_numpy_state(eval_state)
+                ).float().to(self.device)
+                logits, value_eval = self.net.forward_pass(eval_tensor)
+                dist = Categorical(logits=logits)
+                entropy_eval = dist.entropy().mean()
 
-            if episode % debug_interval == 0:
-                with torch.no_grad():
-                    eval_state = env.reset()
-                    eval_state_np = to_numpy_state(eval_state)
-                    eval_tensor = (
-                        torch.from_numpy(eval_state_np)
-                        .float()
-                        .to(self.device)
-                    )
-                    logits, value_eval = self.net.forward_pass(eval_tensor)
-                    dist = Categorical(logits=logits)
-                    entropy_eval = dist.entropy().mean()
+            episode_values.append(value_eval.item())       # NEW
+            episode_entropies.append(entropy_eval.item())  # NEW
 
-                print(f"\nEpisode {episode}")
-                print(f"Loss: {loss.item():.4f}")
-                print(f"Value Estimate: {value_eval.item():.4f}")
-                print(f"Policy logits: {logits.cpu().numpy()}")
-                print(f"Entropy Mean: {entropy_eval.item():.4f}")
-                print(f"Episode Return: {episode_return:.2f}\n")
+        if (episode + 1) % log_interval == 0:
+            print(
+                f"Episode {episode+1}/{self.cfg.num_episodes}, "
+                f"Return: {episode_return:.2f}, Best so far: {best_reward:.2f}"
+            )
 
-        return episode_rewards, best_reward
+    return {
+        "episode_rewards": episode_rewards,
+        "episode_losses": episode_losses,
+        "episode_values": episode_values,
+        "episode_entropies": episode_entropies,
+        "best_reward": best_reward,
+        "config": self.cfg,
+    }
 
 
 # defining helper to infer action dimension from environment
