@@ -14,11 +14,7 @@ class MCConfig:
 
 
 class NStepSarsaMC:
-<<<<<<< HEAD
-    def __init__(
-=======
     def __init__(  # noqa: PLR0913 - constructor needs full hyperparameter set
->>>>>>> 851d10d (Merge conflicts)
         self,
         env,
         config: MCConfig,
