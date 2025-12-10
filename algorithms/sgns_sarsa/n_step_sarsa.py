@@ -41,6 +41,7 @@ class SGNStepSARSA:
         self.num_episodes = 0
         self.mse_data = []
         self.vf_data = []
+        self.reward_data = []
 
     def optimistic_initialization(self, optimistic_value=5.0):
         for s in self.q_sa:
@@ -92,6 +93,10 @@ class SGNStepSARSA:
         actions = [action]
         rewards = []
 
+        # Edit 1: Add reward
+        discounted_return = 0.0
+        discount_power = 0
+
         time = 0
         T = float("inf")
         total_reward = 0
@@ -101,6 +106,8 @@ class SGNStepSARSA:
                 next_state, reward, done = self.env.step(state, action)
                 rewards.append(reward)
                 total_reward += reward
+                discounted_return += (self.gamma**discount_power) * reward
+                discount_power += 1
                 self.num_steps += 1
 
                 if done:
@@ -144,6 +151,7 @@ class SGNStepSARSA:
             time += 1
 
         self.post_episode()
+        self.reward_data.append(discounted_return)
         return total_reward
 
     def post_episode(self):
@@ -172,10 +180,12 @@ class SGNStepSARSA:
         num_episodes: int = 10000,
         alpha: float = 0.1,
         n_steps: int = 3,
+        get_reward_metadata=False,
     ):
         pointer_metadata = []
         mse_metadata = []
         vf_data = []
+        reward_metadata = []
 
         for _ in tqdm(
             range(num_times), desc=f"{num_times} Independent Runs", leave=False
@@ -184,6 +194,10 @@ class SGNStepSARSA:
             pointer_metadata.append(self.pointers.copy())
             mse_metadata.append(self.mse_data.copy())
             vf_data.append(self.vf_data[-1].copy())
+            reward_metadata.append(self.reward_data.copy())
+
+        if get_reward_metadata:
+            return np.array(reward_metadata, dtype=object)
 
         return (
             np.array(pointer_metadata, dtype=object),
