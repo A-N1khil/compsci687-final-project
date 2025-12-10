@@ -310,7 +310,7 @@ class ActorCriticNN(nn.Module):
 
 class ActorCriticAgent:
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - constructor needs full hyperparameter set
         self,
         mdp,
         state_dim,

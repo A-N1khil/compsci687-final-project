@@ -87,7 +87,7 @@ class ContinuousActorCriticAgent:
     Actor-Critic agent for continuous action spaces (e.g., MountainCarContinuous-v0).
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - constructor exposes key hyperparameters
         self,
         mdp,
         state_dim,
