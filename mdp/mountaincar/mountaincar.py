@@ -38,14 +38,19 @@ class MountainCarMDP(MDPBase):
         """Return the discrete action space."""
         return self.action_space
 
-    def step(self, state, action):
-        """
-        Take a step in the environment. 
-        """
+    def step(self, action):
         next_state, reward, terminated, truncated, info = self.env.step(action)
-        done = terminated or truncated # Gymnasium has separate flags for success and timeout , but we need to count both as done
+        done = terminated or truncated
 
-        return (np.array(next_state, dtype=np.float32),reward,done,info,)
+        # Aggressive reward shaping
+        position, velocity = next_state
+        shaped_reward = reward + 100.0 * (position - self.env.observation_space.low[0])
+
+        # Encourage reaching the goal early
+        if self.is_terminal(next_state):
+            shaped_reward += 500.0
+
+        return np.array(next_state, dtype=np.float32), shaped_reward, done, info
 
     def is_terminal(self, state):
         """Terminal when car reaches or passes the goal."""
