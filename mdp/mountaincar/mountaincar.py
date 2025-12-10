@@ -62,6 +62,7 @@ class MountainCarMDP(MDPBase):
 
         return np.array(next_state, dtype=np.float32), shaped_reward, done, info
 
+<<<<<<< HEAD
 =======
     def step(self, state, action):
         """
@@ -73,6 +74,8 @@ class MountainCarMDP(MDPBase):
         return (np.array(next_state, dtype=np.float32),reward,done,info,)
 >>>>>>> develop
 
+=======
+>>>>>>> 851d10d (Merge conflicts)
     def is_terminal(self, state):
         """Terminal when car reaches or passes the goal."""
         return bool(state[0] >= self.goal_pos)
