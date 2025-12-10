@@ -1,15 +1,7 @@
 import numpy as np
 from tqdm.auto import tqdm
-
 from mdp.base_config import BaseConfig
 from mdp.mdp_base import MDPBase
-
-
-class CpConfig:
-    def __init__(self, q_init_choice="optimistic", optimistic_value=5.0, epsilon=0.1):
-        self.q_init_choice = q_init_choice
-        self.optimistic_value = optimistic_value
-        self.epsilon = epsilon
 
 
 class LinearQFn:
@@ -29,17 +21,11 @@ class LinearQFn:
 
 class NStepSarsaCP:
 
-    def __init__(
-        self,
-        env: MDPBase,
-        gamma=0.99,
-        config=CpConfig(),
-        base_config=BaseConfig(42),
-    ):
+    def __init__(self, env: MDPBase, gamma=0.99, epsilon=1, base_config=BaseConfig(42)):
         self.rng = base_config.get_rng()
         self.env = env
         self.gamma = gamma
-        self.config = config
+        self.epsilon = epsilon
 
         self.state_dim = env.state_dim
         self.n_actions = len(env.get_action_space())
@@ -48,37 +34,37 @@ class NStepSarsaCP:
         self.reset()
 
     def reset(self):
-        # For function approximation, valid_states is not needed
         self.num_steps = 0
         self.num_episodes = 0
-        self.mse_data = []
-        self.vf_data = []
         self.episode_rewards = []
         self.discounted_rewards = []
         self.q_func = LinearQFn(self.state_dim, self.n_actions)
 
+    def normalize_state(self, state):
+        # CartPole normalization and clipping
+        s = np.array(state, dtype=np.float32)
+        s[0] /= 2.4  # cart position
+        s[1] /= 2.0  # cart velocity (approx)
+        s[2] /= 0.2095  # pole angle ~ 12°
+        s[3] /= 2.0  # pole angular velocity (approx)
+        return np.clip(s, -1, 1)
+
     def epsilon_greedy_action(self, features, epsilon):
         q_values = [self.q_func(features, a) for a in range(self.n_actions)]
-
-        # --- Check for NaNs or infs ---
         if any(not np.isfinite(q) for q in q_values):
-            # fallback: random action
             return self.rng.choice(range(self.n_actions))
-
         max_q = max(q_values)
         best_actions = [a for a, q in enumerate(q_values) if q == max_q]
-
         if not best_actions:
-            # fallback: random action
             return self.rng.choice(range(self.n_actions))
-
         if self.rng.random() < epsilon:
-            return self.rng.choice(range(self.n_actions))  # explore
-        return self.rng.choice(best_actions)  # exploit
+            return self.rng.choice(range(self.n_actions))
+        return self.rng.choice(best_actions)
 
     def run_episode(self, alpha: float, n_steps: int = 3):
-        state_features = self.env.reset()
-        action = self.epsilon_greedy_action(state_features, self.config.epsilon)
+        state_features = self.normalize_state(self.env.reset())
+        epsilon = max(0.01, self.epsilon * (0.995**self.num_episodes))
+        action = self.epsilon_greedy_action(state_features, epsilon)
 
         states = [state_features]
         actions = [action]
@@ -87,13 +73,13 @@ class NStepSarsaCP:
         time = 0
         T = 1e11  # Infinity
         total_reward = 0
-        current_alpha = alpha / (1 + self.num_episodes * 0.001)
 
         while True:
             if time < T:
                 next_state_features, reward, done = self.env.step(
                     states[time], actions[time]
                 )
+                next_state_features = self.normalize_state(next_state_features)
                 rewards.append(reward)
                 total_reward += reward
                 self.num_steps += 1
@@ -104,7 +90,7 @@ class NStepSarsaCP:
                     actions.append(None)
                 else:
                     next_action = self.epsilon_greedy_action(
-                        next_state_features, self.config.epsilon
+                        next_state_features, epsilon
                     )
                     states.append(next_state_features)
                     actions.append(next_action)
@@ -112,14 +98,15 @@ class NStepSarsaCP:
                     action = next_action
 
             tau = time - n_steps + 1
-
             if tau >= 0:
                 # Compute n-step return
-                G = 0.0
-                for i in range(tau, min(tau + n_steps, T)):
-                    G += (self.gamma ** (i - tau)) * rewards[i]
+                G = sum(
+                    (self.gamma ** (i - tau)) * rewards[i]
+                    for i in range(tau, min(tau + n_steps, T))
+                )
 
-                if tau + n_steps < T:
+                # Bootstrap if not terminal
+                if tau + n_steps < T and actions[tau + n_steps] is not None:
                     G += (self.gamma**n_steps) * self.q_func(
                         states[tau + n_steps], actions[tau + n_steps]
                     )
@@ -129,16 +116,15 @@ class NStepSarsaCP:
                 a_tau = actions[tau]
                 if a_tau is not None:
                     td_error = G - self.q_func(s_tau, a_tau)
-                    self.q_func.theta[a_tau] += current_alpha * s_tau * td_error
+                    self.q_func.theta[a_tau] += alpha * s_tau * td_error
 
             if tau == T - 1:
                 break
             time += 1
 
+        # Track rewards
         self.episode_rewards.append(total_reward)
-        discounted_reward = 0.0
-        for t, r in enumerate(rewards):
-            discounted_reward += r * (self.gamma**t)
+        discounted_reward = sum(r * (self.gamma**t) for t, r in enumerate(rewards))
         self.discounted_rewards.append(discounted_reward)
         self.num_episodes += 1
 
