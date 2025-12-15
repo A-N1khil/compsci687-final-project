@@ -211,3 +211,6 @@ __marimo__/
 
 # Ignore pycaches and checkpoints
 .ipynb_checkpoints/
+
+# PDF
+*.pdf
